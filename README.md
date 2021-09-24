@@ -10,6 +10,7 @@ PyTorch re-implementation of [EAST: An Efficient and Accurate Scene Text Detecto
 
 
 ## Description:
+*after 600 epochs:
 
 | Model | Loss | Recall | Precision | F-score |
 |-------|------|--------|-----------|---------|
@@ -30,15 +31,17 @@ PyTorch re-implementation of [EAST: An Efficient and Accurate Scene Text Detecto
 ```
 .
 ├── EAST
+│   ├── assets
 │   ├── evaluate
 │   ├── nets
 │   ├── utils
 │   └── weights
-└── ICDAR_2015
-    ├── test_gt
-    ├── test_img
-    ├── train_gt
-    └── train_img
+└── data
+    └──ICDAR_2015
+        ├── test_gt
+        ├── test_img
+        ├── train_gt
+        └── train_img
 
 ```
 
