@@ -2,7 +2,7 @@
 
 PyTorch re-implementation of [EAST: An Efficient and Accurate Scene Text Detector](https://arxiv.org/pdf/1704.03155.pdf).
 
-
+**Note!** This is original structure of EAST but, in this repo, VGG is used as a feature extractor.
 <div align='center'>
   <img src='assets/east.jpg'>
 </div>
