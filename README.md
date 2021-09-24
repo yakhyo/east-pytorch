@@ -18,7 +18,8 @@ PyTorch re-implementation of [EAST: An Efficient and Accurate Scene Text Detecto
 | Re-Implement | Dice | 81.65 | 80.98 | 81.31 |
 
 Run:
-```https://github.com/yakhyo/EAST-pt.git
+```
+   git clone https://github.com/yakhyo/EAST-pt.git
    cd EAST-pt
    python detect.py
 ```
