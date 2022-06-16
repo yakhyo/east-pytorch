@@ -10,12 +10,12 @@ from torch.utils import data
 
 
 def cal_distance(x1, y1, x2, y2):
-    '''calculate the Euclidean distance'''
+    """calculate the Euclidean distance"""
     return math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
 
 
 def move_points(vertices, index1, index2, r, coef):
-    '''move the two points to shrink edge
+    """move the two points to shrink edge
     Input:
         vertices: vertices of text region <numpy.ndarray, (8,)>
         index1  : offset of point1
@@ -24,7 +24,7 @@ def move_points(vertices, index1, index2, r, coef):
         coef    : shrink ratio in paper
     Output:
         vertices: vertices where one edge has been shinked
-    '''
+    """
     index1 = index1 % 4
     index2 = index2 % 4
     x1_index = index1 * 2 + 0
@@ -48,13 +48,13 @@ def move_points(vertices, index1, index2, r, coef):
 
 
 def shrink_poly(vertices, coef=0.3):
-    '''shrink the text region
+    """shrink the text region
     Input:
         vertices: vertices of text region <numpy.ndarray, (8,)>
         coef    : shrink ratio in paper
     Output:
         v       : vertices of shrinked text region <numpy.ndarray, (8,)>
-    '''
+    """
     x1, y1, x2, y2, x3, y3, x4, y4 = vertices
     r1 = min(cal_distance(x1, y1, x2, y2), cal_distance(x1, y1, x4, y4))
     r2 = min(cal_distance(x2, y2, x1, y1), cal_distance(x2, y2, x3, y3))
@@ -78,19 +78,19 @@ def shrink_poly(vertices, coef=0.3):
 
 
 def get_rotate_mat(theta):
-    '''positive theta value means rotate clockwise'''
+    """positive theta value means rotate clockwise"""
     return np.array([[math.cos(theta), -math.sin(theta)], [math.sin(theta), math.cos(theta)]])
 
 
 def rotate_vertices(vertices, theta, anchor=None):
-    '''rotate vertices around anchor
+    """rotate vertices around anchor
     Input:
         vertices: vertices of text region <numpy.ndarray, (8,)>
         theta   : angle in radian measure
         anchor  : fixed position during rotation
     Output:
         rotated vertices <numpy.ndarray, (8,)>
-    '''
+    """
     v = vertices.reshape((4, 2)).T
     if anchor is None:
         anchor = v[:, :1]
@@ -100,12 +100,12 @@ def rotate_vertices(vertices, theta, anchor=None):
 
 
 def get_boundary(vertices):
-    '''get the tight boundary around given vertices
+    """get the tight boundary around given vertices
     Input:
         vertices: vertices of text region <numpy.ndarray, (8,)>
     Output:
         the boundary
-    '''
+    """
     x1, y1, x2, y2, x3, y3, x4, y4 = vertices
     x_min = min(x1, x2, x3, x4)
     x_max = max(x1, x2, x3, x4)
@@ -115,13 +115,13 @@ def get_boundary(vertices):
 
 
 def cal_error(vertices):
-    '''default orientation is x1y1 : left-top, x2y2 : right-top, x3y3 : right-bot, x4y4 : left-bot
+    """default orientation is x1y1 : left-top, x2y2 : right-top, x3y3 : right-bot, x4y4 : left-bot
     calculate the difference between the vertices orientation and default orientation
     Input:
         vertices: vertices of text region <numpy.ndarray, (8,)>
     Output:
         err     : difference measure
-    '''
+    """
     x_min, x_max, y_min, y_max = get_boundary(vertices)
     x1, y1, x2, y2, x3, y3, x4, y4 = vertices
     err = cal_distance(x1, y1, x_min, y_min) + cal_distance(x2, y2, x_max, y_min) + \
@@ -130,12 +130,12 @@ def cal_error(vertices):
 
 
 def find_min_rect_angle(vertices):
-    '''find the best angle to rotate poly and obtain min rectangle
+    """find the best angle to rotate poly and obtain min rectangle
     Input:
         vertices: vertices of text region <numpy.ndarray, (8,)>
     Output:
         the best angle <radian measure>
-    '''
+    """
     angle_interval = 1
     angle_list = list(range(-90, 90, angle_interval))
     area_list = []
@@ -161,14 +161,14 @@ def find_min_rect_angle(vertices):
 
 
 def is_cross_text(start_loc, length, vertices):
-    '''check if the crop image crosses text regions
+    """check if the crop image crosses text regions
     Input:
         start_loc: left-top position
         length   : length of crop image
         vertices : vertices of text regions <numpy.ndarray, (n,8)>
     Output:
         True if crop image crosses text region
-    '''
+    """
     if vertices.size == 0:
         return False
     start_w, start_h = start_loc
@@ -184,7 +184,7 @@ def is_cross_text(start_loc, length, vertices):
 
 
 def crop_img(img, vertices, labels, length):
-    '''crop img patches to obtain batch and augment
+    """crop img patches to obtain batch and augment
     Input:
         img         : PIL Image
         vertices    : vertices of text regions <numpy.ndarray, (n,8)>
@@ -193,7 +193,7 @@ def crop_img(img, vertices, labels, length):
     Output:
         region      : cropped image region
         new_vertices: new vertices in cropped region
-    '''
+    """
     h, w = img.height, img.width
     # confirm the shortest side of image >= length
     if h >= w and w < length:
@@ -230,7 +230,7 @@ def crop_img(img, vertices, labels, length):
 
 
 def rotate_all_pixels(rotate_mat, anchor_x, anchor_y, length):
-    '''get rotated locations of all pixels for next stages
+    """get rotated locations of all pixels for next stages
     Input:
         rotate_mat: rotatation matrix
         anchor_x  : fixed x position
@@ -239,7 +239,7 @@ def rotate_all_pixels(rotate_mat, anchor_x, anchor_y, length):
     Output:
         rotated_x : rotated x positions <numpy.ndarray, (length,length)>
         rotated_y : rotated y positions <numpy.ndarray, (length,length)>
-    '''
+    """
     x = np.arange(length)
     y = np.arange(length)
     x, y = np.meshgrid(x, y)
@@ -254,7 +254,7 @@ def rotate_all_pixels(rotate_mat, anchor_x, anchor_y, length):
 
 
 def adjust_height(img, vertices, ratio=0.2):
-    '''adjust height of image to aug data
+    """adjust height of image to aug data
     Input:
         img         : PIL Image
         vertices    : vertices of text regions <numpy.ndarray, (n,8)>
@@ -262,7 +262,7 @@ def adjust_height(img, vertices, ratio=0.2):
     Output:
         img         : adjusted PIL Image
         new_vertices: adjusted vertices
-    '''
+    """
     ratio_h = 1 + ratio * (np.random.rand() * 2 - 1)
     old_h = img.height
     new_h = int(np.around(old_h * ratio_h))
@@ -275,7 +275,7 @@ def adjust_height(img, vertices, ratio=0.2):
 
 
 def rotate_img(img, vertices, angle_range=10):
-    '''rotate image [-10, 10] degree to aug data
+    """rotate image [-10, 10] degree to aug data
     Input:
         img         : PIL Image
         vertices    : vertices of text regions <numpy.ndarray, (n,8)>
@@ -283,7 +283,7 @@ def rotate_img(img, vertices, angle_range=10):
     Output:
         img         : rotated PIL Image
         new_vertices: rotated vertices
-    '''
+    """
     center_x = (img.width - 1) / 2
     center_y = (img.height - 1) / 2
     angle = angle_range * (np.random.rand() * 2 - 1)
@@ -295,7 +295,7 @@ def rotate_img(img, vertices, angle_range=10):
 
 
 def get_score_geo(img, vertices, labels, scale, length):
-    '''generate score gt and geometry gt
+    """generate score gt and geometry gt
     Input:
         img     : PIL Image
         vertices: vertices of text regions <numpy.ndarray, (n,8)>
@@ -304,7 +304,7 @@ def get_score_geo(img, vertices, labels, scale, length):
         length  : image length
     Output:
         score gt, geo gt, ignored
-    '''
+    """
     score_map = np.zeros((int(img.height * scale), int(img.width * scale), 1), np.float32)
     geo_map = np.zeros((int(img.height * scale), int(img.width * scale), 5), np.float32)
     ignored_map = np.zeros((int(img.height * scale), int(img.width * scale), 1), np.float32)
@@ -352,13 +352,13 @@ def get_score_geo(img, vertices, labels, scale, length):
 
 
 def extract_vertices(lines):
-    '''extract vertices info from txt lines
+    """extract vertices info from txt lines
     Input:
         lines   : list of string info
     Output:
         vertices: vertices of text regions <numpy.ndarray, (n,8)>
         labels  : 1->valid, 0->ignore, <numpy.ndarray, (n,)>
-    '''
+    """
     labels = []
     vertices = []
     for line in lines:

@@ -182,7 +182,7 @@ def detect_dataset(model, device, test_img_path, submit_path):
 
 if __name__ == '__main__':
     img_path = 'data/ch4_test_images/img_2.jpg'
-    model_path = 'weights/model_epoch_400.pth'
+    model_path = 'weights/model_epoch_10.pth'
     res_img = 'res.png'
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = EAST().to(device)

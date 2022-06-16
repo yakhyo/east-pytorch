@@ -68,7 +68,7 @@ if __name__ == '__main__':
     parser.add_argument("--learning-rate", default=1e-3, type=float, help="Learning rate")
     parser.add_argument("--num-workers", default=8, type=int, help="Number of workers")
     parser.add_argument("--epochs", default=600, type=int, help="Number of epochs")
-    parser.add_argument("--interval", default=10, type=int, help="Interval to save weights")
+    parser.add_argument("--interval", default=50, type=int, help="Interval to save weights")
 
     config = parser.parse_args()
 

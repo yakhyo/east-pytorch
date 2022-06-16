@@ -2,11 +2,35 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torchvision.models import vgg16_bn
 
-cfg = [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 'M', 512, 512, 512, 'M', 512, 512, 512, 'M']
+
+# def copy_weights(model1, model2):
+#     model1.eval()
+#     model2.eval()
+#     with torch.no_grad():
+#         m1_std = model1.state_dict().values()
+#         m2_std = model2.state_dict().values()
+#         for m1, m2 in zip(m1_std, m2_std):
+#             m1.copy_(m2)
+
+# state = {'model': model1.half()}
+# torch.save(state, f'weights/best_tf.pt')
+
+
+# def copy_weights(model1, model2):
+#     model1.eval()
+#     model2.eval()
+#     params1 = model1.parameters()
+#     params2 = model2.parameters()
+#
+#     with torch.no_grad():
+#         for param1, param2 in zip(params1, params2):
+#             param2.data.copy_(param1.data)
 
 
 def _init_weights(self):
+    """ Standard weight initializer """
     for m in self.modules():
         if isinstance(m, nn.Conv2d):
             nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
@@ -20,14 +44,16 @@ def _init_weights(self):
             nn.init.constant_(m.bias, 0)
 
 
-class Conv2dNormActivation(nn.Module):
+class Conv(nn.Module):
+    """ Standard convolution module """
+
     def __init__(
             self,
             in_channels: int,
             out_channels: int,
-            kernel_size: int = 1,
+            kernel_size: int,
             stride: int = 1,
-            padding: int = 1,
+            padding: int = 0,
             dilation: int = 1,
             groups: int = 1,
             norm: bool = False,
@@ -51,45 +77,46 @@ class Conv2dNormActivation(nn.Module):
 
 
 class VGG16(nn.Module):
+    """ VGG16 with batch normalization """
 
-    def __init__(self, num_classes: int = 1000, init_weights: bool = True, dropout: float = 0.5):
+    def __init__(self, num_classes: int = 1000, init_weights: bool = True, dropout: float = 0.5) -> None:
         super().__init__()
 
         # p1/2
         self.p1 = nn.Sequential(
-            Conv2dNormActivation(in_channels=3, out_channels=64, kernel_size=3, norm=False, act='relu', bias=True),
-            Conv2dNormActivation(in_channels=64, out_channels=64, kernel_size=3, norm=False, act='relu', bias=True),
+            Conv(in_channels=3, out_channels=64, kernel_size=3, padding=1, norm=True, act='relu'),
+            Conv(in_channels=64, out_channels=64, kernel_size=3, padding=1, norm=True, act='relu'),
             nn.MaxPool2d(kernel_size=2, stride=2),
         )
 
         # p2/4
         self.p2 = nn.Sequential(
-            Conv2dNormActivation(in_channels=64, out_channels=128, kernel_size=3, norm=False, act='relu', bias=True),
-            Conv2dNormActivation(in_channels=128, out_channels=128, kernel_size=3, norm=False, act='relu', bias=True),
+            Conv(in_channels=64, out_channels=128, kernel_size=3, padding=1, norm=True, act='relu'),
+            Conv(in_channels=128, out_channels=128, kernel_size=3, padding=1, norm=True, act='relu'),
             nn.MaxPool2d(kernel_size=2, stride=2),
         )
 
         # p3/8
         self.p3 = nn.Sequential(
-            Conv2dNormActivation(in_channels=128, out_channels=256, kernel_size=3, norm=False, act='relu', bias=True),
-            Conv2dNormActivation(in_channels=256, out_channels=256, kernel_size=3, norm=False, act='relu', bias=True),
-            Conv2dNormActivation(in_channels=256, out_channels=256, kernel_size=3, norm=False, act='relu', bias=True),
+            Conv(in_channels=128, out_channels=256, kernel_size=3, padding=1, norm=True, act='relu'),
+            Conv(in_channels=256, out_channels=256, kernel_size=3, padding=1, norm=True, act='relu'),
+            Conv(in_channels=256, out_channels=256, kernel_size=3, padding=1, norm=True, act='relu'),
             nn.MaxPool2d(kernel_size=2, stride=2),
         )
 
         # p4/16
         self.p4 = nn.Sequential(
-            Conv2dNormActivation(in_channels=256, out_channels=512, kernel_size=3, norm=False, act='relu', bias=True),
-            Conv2dNormActivation(in_channels=512, out_channels=512, kernel_size=3, norm=False, act='relu', bias=True),
-            Conv2dNormActivation(in_channels=512, out_channels=512, kernel_size=3, norm=False, act='relu', bias=True),
+            Conv(in_channels=256, out_channels=512, kernel_size=3, padding=1, norm=True, act='relu'),
+            Conv(in_channels=512, out_channels=512, kernel_size=3, padding=1, norm=True, act='relu'),
+            Conv(in_channels=512, out_channels=512, kernel_size=3, padding=1, norm=True, act='relu'),
             nn.MaxPool2d(kernel_size=2, stride=2),
         )
 
         # p5/32
         self.p5 = nn.Sequential(
-            Conv2dNormActivation(in_channels=512, out_channels=512, kernel_size=3, norm=False, act='relu', bias=True),
-            Conv2dNormActivation(in_channels=512, out_channels=512, kernel_size=3, norm=False, act='relu', bias=True),
-            Conv2dNormActivation(in_channels=512, out_channels=512, kernel_size=3, norm=False, act='relu', bias=True),
+            Conv(in_channels=512, out_channels=512, kernel_size=3, padding=1, norm=True, act='relu'),
+            Conv(in_channels=512, out_channels=512, kernel_size=3, padding=1, norm=True, act='relu'),
+            Conv(in_channels=512, out_channels=512, kernel_size=3, padding=1, norm=True, act='relu'),
             nn.MaxPool2d(kernel_size=2, stride=2),
         )
 
@@ -113,112 +140,42 @@ class VGG16(nn.Module):
         p3 = self.p3(p2)
         p4 = self.p4(p3)
         p5 = self.p5(p4)
+        x = self.pool(p5)
+        x = torch.flatten(x, 1)
+        x = self.classifier(x)
 
-        return p2, p3, p4, p5
-
-
-class FeatureMerge(nn.Module):
-    def __init__(self):
-        super().__init__()
-
-        self.conv1 = nn.Conv2d(1024, 128, 1)
-        self.bn1 = nn.BatchNorm2d(128)
-        self.relu1 = nn.ReLU()
-        self.conv2 = nn.Conv2d(128, 128, 3, padding=1)
-        self.bn2 = nn.BatchNorm2d(128)
-        self.relu2 = nn.ReLU()
-
-        self.conv3 = nn.Conv2d(384, 64, 1)
-        self.bn3 = nn.BatchNorm2d(64)
-        self.relu3 = nn.ReLU()
-        self.conv4 = nn.Conv2d(64, 64, 3, padding=1)
-        self.bn4 = nn.BatchNorm2d(64)
-        self.relu4 = nn.ReLU()
-
-        self.conv5 = nn.Conv2d(192, 32, 1)
-        self.bn5 = nn.BatchNorm2d(32)
-        self.relu5 = nn.ReLU()
-        self.conv6 = nn.Conv2d(32, 32, 3, padding=1)
-        self.bn6 = nn.BatchNorm2d(32)
-        self.relu6 = nn.ReLU()
-
-        self.conv7 = nn.Conv2d(32, 32, 3, padding=1)
-        self.bn7 = nn.BatchNorm2d(32)
-        self.relu7 = nn.ReLU()
-
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-                if m.bias is not None:
-                    nn.init.constant_(m.bias, 0)
-            elif isinstance(m, nn.BatchNorm2d):
-                nn.init.constant_(m.weight, 1)
-                nn.init.constant_(m.bias, 0)
-
-    def forward(self, x):
-        p2, p3, p4, p5 = x
-        y = F.interpolate(p5, scale_factor=2, mode='bilinear', align_corners=True)
-        y = torch.cat((y, p4), 1)
-        y = self.relu1(self.bn1(self.conv1(y)))
-        y = self.relu2(self.bn2(self.conv2(y)))
-
-        y = F.interpolate(y, scale_factor=2, mode='bilinear', align_corners=True)
-        y = torch.cat((y, p3), 1)
-        y = self.relu3(self.bn3(self.conv3(y)))
-        y = self.relu4(self.bn4(self.conv4(y)))
-
-        y = F.interpolate(y, scale_factor=2, mode='bilinear', align_corners=True)
-        y = torch.cat((y, p2), 1)
-        y = self.relu5(self.bn5(self.conv5(y)))
-        y = self.relu6(self.bn6(self.conv6(y)))
-
-        y = self.relu7(self.bn7(self.conv7(y)))
-        return y
-
-
-class Head(nn.Module):
-    def __init__(self, scope: int = 512, init_weight: bool = True):
-        super().__init__()
-
-        self.conv1 = nn.Conv2d(32, 1, 1)
-        self.sigmoid1 = nn.Sigmoid()
-
-        self.conv2 = nn.Conv2d(32, 4, 1)
-        self.sigmoid2 = nn.Sigmoid()
-
-        self.conv3 = nn.Conv2d(32, 1, 1)
-        self.sigmoid3 = nn.Sigmoid()
-
-        self.scope = scope
-
-        if init_weight:
-            _init_weights(self)
-
-    def forward(self, x):
-        score = self.sigmoid1(self.conv1(x))
-        loc = self.sigmoid2(self.conv2(x)) * self.scope
-        angle = (self.sigmoid3(self.conv3(x)) - 0.5) * math.pi
-        geo = torch.cat((loc, angle), 1)
-        return score, geo
-
-
-class EAST(nn.Module):
-    def __init__(self, pretrained=False):
-        super(EAST, self).__init__()
-        self.backbone = VGG16()
-        self.merge = FeatureMerge()
-        self.detect = Head()
-
-    def forward(self, x):
-        return self.detect(self.merge(self.backbone(x)))
+        return x
 
 
 if __name__ == '__main__':
-    # ggg = VGG16()
-    # print(ggg)
-    # print(sum(p.numel() for p in ggg.parameters() if p.requires_grad))
-    m = EAST()
-    x = torch.randn(1, 3, 256, 256)
-    score, geo = m(x)
-    print(score.shape)
-    print(geo.shape)
+    model1 = vgg16_bn(pretrained=True)
+    model2 = VGG16()
+    copy_weights(model1, model2)
+
+    from PIL import Image
+
+    image = Image.open('cat.jpg')
+
+    from torchvision import transforms
+
+    transform = transforms.Compose([  # [1]
+        transforms.Resize(256),  # [2]
+        transforms.CenterCrop(224),  # [3]
+        transforms.ToTensor(),  # [4]
+        transforms.Normalize(  # [5]
+            mean=[0.485, 0.456, 0.406],  # [6]
+            std=[0.229, 0.224, 0.225]  # [7]
+        )])
+
+    img_t = transform(image)
+    batch_t = torch.unsqueeze(img_t, 0)
+
+    model1.eval()
+    out = model1(batch_t)
+    _, index = torch.max(out, 1)
+    print(index)
+
+    model2.eval()
+    out = model2(batch_t)
+    _, index = torch.max(out, 1)
+    print(index)
