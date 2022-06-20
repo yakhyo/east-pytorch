@@ -2,22 +2,24 @@ import torch
 from torch.utils import data
 from torch import nn
 from torch.optim import lr_scheduler
-from dataset import custom_dataset
+from dataset import Dataset
 from model import EAST
 from loss import Loss
 import os
 import time
 
 import argparse
-import temp
 
 
 def train(args):
     file_num = len(os.listdir(args.train_images))
-    trainset = custom_dataset(args.train_images, args.train_labels)
-    train_loader = data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers,
-                                   drop_last=True)
+    trainset = Dataset(args.train_images, args.train_labels)
 
+    train_loader = data.DataLoader(trainset,
+                                   batch_size=args.batch_size,
+                                   num_workers=args.num_workers,
+                                   shuffle=True,
+                                   drop_last=True)
     criterion = Loss()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = EAST()
@@ -31,10 +33,9 @@ def train(args):
 
     for epoch in range(args.epochs):
         model.train()
-        scheduler.step()
         epoch_loss = 0
         epoch_time = time.time()
-        for i, (img, gt_score, gt_geo, ignored_map) in enumerate(train_loader):
+        for idx, (img, gt_score, gt_geo, ignored_map) in enumerate(train_loader):
             start_time = time.time()
             img, gt_score, gt_geo, ignored_map = img.to(device), gt_score.to(device), gt_geo.to(device), ignored_map.to(
                 device)
@@ -46,10 +47,15 @@ def train(args):
             loss.backward()
             optimizer.step()
 
-            print('Epoch is [{}/{}], mini-batch is [{}/{}], time consumption is {:.8f}, batch_loss is {:.8f}'.format( \
-                epoch + 1, args.epochs, i + 1, int(file_num / args.batch_size), time.time() - start_time, loss.item()))
+            print('Epoch: [{}/{} ({}/{})]\t'
+                  'Time: {:>4.4f}\t'
+                  'Batch Loss: {:>4.4f}'.format(epoch, args.epochs, idx, file_num // args.batch_size,
+                                                time.time() - start_time,
+                                                loss.item())
+                  )
 
-        print('epoch_loss is {:.8f}, epoch_time is {:.8f}'.format(epoch_loss / int(file_num / args.batch_size),
+        scheduler.step()
+        print('Epoch Loss is {:.8f}, epoch_time is {:.8f}'.format(epoch_loss / (file_num // args.batch_size),
                                                                   time.time() - epoch_time))
         print(time.asctime(time.localtime(time.time())))
         print('=' * 50)
