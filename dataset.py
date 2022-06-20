@@ -9,8 +9,8 @@ import torchvision.transforms as transforms
 from torch.utils import data
 
 
-def cal_distance(x1, y1, x2, y2):
-    """calculate the Euclidean distance"""
+def distance(x1, y1, x2, y2):
+    """ Euclidean Distance """
     return math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
 
 
@@ -36,7 +36,7 @@ def move_points(vertices, index1, index2, r, coef):
     r2 = r[index2]
     length_x = vertices[x1_index] - vertices[x2_index]
     length_y = vertices[y1_index] - vertices[y2_index]
-    length = cal_distance(vertices[x1_index], vertices[y1_index], vertices[x2_index], vertices[y2_index])
+    length = distance(vertices[x1_index], vertices[y1_index], vertices[x2_index], vertices[y2_index])
     if length > 1:
         ratio = (r1 * coef) / length
         vertices[x1_index] += ratio * (-length_x)
@@ -56,15 +56,15 @@ def shrink_poly(vertices, coef=0.3):
         v       : vertices of shrinked text region <numpy.ndarray, (8,)>
     """
     x1, y1, x2, y2, x3, y3, x4, y4 = vertices
-    r1 = min(cal_distance(x1, y1, x2, y2), cal_distance(x1, y1, x4, y4))
-    r2 = min(cal_distance(x2, y2, x1, y1), cal_distance(x2, y2, x3, y3))
-    r3 = min(cal_distance(x3, y3, x2, y2), cal_distance(x3, y3, x4, y4))
-    r4 = min(cal_distance(x4, y4, x1, y1), cal_distance(x4, y4, x3, y3))
+    r1 = min(distance(x1, y1, x2, y2), distance(x1, y1, x4, y4))
+    r2 = min(distance(x2, y2, x1, y1), distance(x2, y2, x3, y3))
+    r3 = min(distance(x3, y3, x2, y2), distance(x3, y3, x4, y4))
+    r4 = min(distance(x4, y4, x1, y1), distance(x4, y4, x3, y3))
     r = [r1, r2, r3, r4]
 
     # obtain offset to perform move_points() automatically
-    if cal_distance(x1, y1, x2, y2) + cal_distance(x3, y3, x4, y4) > \
-            cal_distance(x2, y2, x3, y3) + cal_distance(x1, y1, x4, y4):
+    if distance(x1, y1, x2, y2) + distance(x3, y3, x4, y4) > \
+            distance(x2, y2, x3, y3) + distance(x1, y1, x4, y4):
         offset = 0  # two longer edges are (x1y1-x2y2) & (x3y3-x4y4)
     else:
         offset = 1  # two longer edges are (x2y2-x3y3) & (x4y4-x1y1)
@@ -83,7 +83,7 @@ def get_rotate_mat(theta):
 
 
 def rotate_vertices(vertices, theta, anchor=None):
-    """rotate vertices around anchor
+    """ Rotate vertices around anchor
     Input:
         vertices: vertices of text region <numpy.ndarray, (8,)>
         theta   : angle in radian measure
@@ -100,7 +100,7 @@ def rotate_vertices(vertices, theta, anchor=None):
 
 
 def get_boundary(vertices):
-    """get the tight boundary around given vertices
+    """ Get the tight boundary around given vertices
     Input:
         vertices: vertices of text region <numpy.ndarray, (8,)>
     Output:
@@ -114,8 +114,8 @@ def get_boundary(vertices):
     return x_min, x_max, y_min, y_max
 
 
-def cal_error(vertices):
-    """default orientation is x1y1 : left-top, x2y2 : right-top, x3y3 : right-bot, x4y4 : left-bot
+def calculate_error(vertices):
+    """ Default orientation is x1y1 : left-top, x2y2 : right-top, x3y3 : right-bot, x4y4 : left-bot
     calculate the difference between the vertices orientation and default orientation
     Input:
         vertices: vertices of text region <numpy.ndarray, (8,)>
@@ -124,8 +124,8 @@ def cal_error(vertices):
     """
     x_min, x_max, y_min, y_max = get_boundary(vertices)
     x1, y1, x2, y2, x3, y3, x4, y4 = vertices
-    err = cal_distance(x1, y1, x_min, y_min) + cal_distance(x2, y2, x_max, y_min) + \
-          cal_distance(x3, y3, x_max, y_max) + cal_distance(x4, y4, x_min, y_max)
+    err = distance(x1, y1, x_min, y_min) + distance(x2, y2, x_max, y_min) + \
+          distance(x3, y3, x_max, y_max) + distance(x4, y4, x_min, y_max)
     return err
 
 
@@ -153,7 +153,7 @@ def find_min_rect_angle(vertices):
     # find the best angle with correct orientation
     for index in sorted_area_index[:rank_num]:
         rotated = rotate_vertices(vertices, angle_list[index] / 180 * math.pi)
-        temp_error = cal_error(rotated)
+        temp_error = calculate_error(rotated)
         if temp_error < min_error:
             min_error = temp_error
             best_index = index
@@ -230,7 +230,7 @@ def crop_img(img, vertices, labels, length):
 
 
 def rotate_all_pixels(rotate_mat, anchor_x, anchor_y, length):
-    """get rotated locations of all pixels for next stages
+    """ Get rotated locations of all pixels for next stages
     Input:
         rotate_mat: rotatation matrix
         anchor_x  : fixed x position
@@ -254,7 +254,7 @@ def rotate_all_pixels(rotate_mat, anchor_x, anchor_y, length):
 
 
 def adjust_height(img, vertices, ratio=0.2):
-    """adjust height of image to aug data
+    """ Adjust height of image to aug data
     Input:
         img         : PIL Image
         vertices    : vertices of text regions <numpy.ndarray, (n,8)>
@@ -275,7 +275,7 @@ def adjust_height(img, vertices, ratio=0.2):
 
 
 def rotate_img(img, vertices, angle_range=10):
-    """rotate image [-10, 10] degree to aug data
+    """ Rotate image [-10, 10] degree to aug data
     Input:
         img         : PIL Image
         vertices    : vertices of text regions <numpy.ndarray, (n,8)>

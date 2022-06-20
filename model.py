@@ -205,12 +205,12 @@ class Head(nn.Module):
             _init_weights(self)
 
     def forward(self, x: torch.Tensor) -> tuple:
-        score = self.conv1(x)
+        confidence = self.conv1(x)
         loc = self.conv2(x) * self.scope
         angle = (self.conv3(x) - 0.5) * math.pi
-        geo = torch.cat((loc, angle), 1)
+        geometries = torch.cat((loc, angle), 1)
 
-        return score, geo
+        return confidence, geometries
 
 
 class EAST(nn.Module):
