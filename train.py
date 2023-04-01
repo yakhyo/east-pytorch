@@ -7,9 +7,9 @@ from torch import nn
 from torch.utils import data
 from torch.optim import lr_scheduler
 
-from east.loss import Loss
+from east.utils.loss import Loss
 from east.models import EAST
-from east.utils import Dataset
+from east.utils.dataset import Dataset
 
 
 def train(args):
