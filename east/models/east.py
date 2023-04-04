@@ -1,236 +1,217 @@
 import math
+from typing import cast, Dict, List, Optional, Tuple, Union
+
 import torch
 import torch.nn as nn
-import torch.nn.functional
+from torch.nn import functional as F
+
+cfgs: Dict[str, List[Union[str, int]]] = {
+    "A": [64, "M", 128, "M", 256, 256, "M", 512, 512, "M", 512, 512, "M"],
+    "B": [64, 64, "M", 128, 128, "M", 256, 256, "M", 512, 512, "M", 512, 512, "M"],
+    "D": [64, 64, "M", 128, 128, "M", 256, 256, 256, "M", 512, 512, 512, "M", 512, 512, 512, "M"],
+    "E": [64, 64, "M", 128, 128, "M", 256, 256, 256, 256, "M", 512, 512, 512, 512, "M", 512, 512, 512, 512, "M"],
+}
 
 
-# def copy_weights(model1, model2):
-#     model1.eval()
-#     model2.eval()
-#     with torch.no_grad():
-#         m1_std = model1.state_dict().values()
-#         m2_std = model2.state_dict().values()
-#         for m1, m2 in zip(m1_std, m2_std):
-#             m1.copy_(m2)
-
-def _init_weights(self):
-    """ Standard weight initializer """
-    for m in self.modules():
-        if isinstance(m, nn.Conv2d):
-            nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
-            if m.bias is not None:
-                nn.init.constant_(m.bias, 0)
-        elif isinstance(m, nn.BatchNorm2d):
-            nn.init.constant_(m.weight, 1)
-            nn.init.constant_(m.bias, 0)
-        elif isinstance(m, nn.Linear):
-            nn.init.normal_(m.weight, 0, 0.01)
-            nn.init.constant_(m.bias, 0)
-
-
-class Interpolate(nn.Module):
-    """ Wrapper class for `nn.functional.interpolate()` """
-
-    def __init__(self, scale_factor: int, mode: str = 'bilinear', align_corners: bool = None) -> None:
+class VGG(nn.Module):
+    def __init__(
+            self, features: nn.Module, num_classes: int = 1000, init_weights: bool = True, dropout: float = 0.5
+    ) -> None:
         super().__init__()
-        self.fn = nn.functional.interpolate
-        self.scale_factor = scale_factor
-        self.mode = mode
-        self.align_corners = align_corners
+        self.features = features
+        self.avgpool = nn.AdaptiveAvgPool2d((7, 7))
+        self.classifier = nn.Sequential(
+            nn.Linear(512 * 7 * 7, 4096),
+            nn.ReLU(True),
+            nn.Dropout(p=dropout),
+            nn.Linear(4096, 4096),
+            nn.ReLU(True),
+            nn.Dropout(p=dropout),
+            nn.Linear(4096, num_classes),
+        )
+        if init_weights:
+            for m in self.modules():
+                if isinstance(m, nn.Conv2d):
+                    nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
+                    if m.bias is not None:
+                        nn.init.constant_(m.bias, 0)
+                elif isinstance(m, nn.BatchNorm2d):
+                    nn.init.constant_(m.weight, 1)
+                    nn.init.constant_(m.bias, 0)
+                elif isinstance(m, nn.Linear):
+                    nn.init.normal_(m.weight, 0, 0.01)
+                    nn.init.constant_(m.bias, 0)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.fn(input=x, scale_factor=self.scale_factor, mode=self.mode, align_corners=self.align_corners)
-
+        x = self.features(x)
+        x = self.avgpool(x)
+        x = torch.flatten(x, 1)
+        x = self.classifier(x)
         return x
 
 
+def make_layers(cfg: List[Union[str, int]], batch_norm: bool = False) -> nn.Sequential:
+    layers: List[nn.Module] = []
+    in_channels = 3
+    for v in cfg:
+        if v == "M":
+            layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
+        else:
+            v = cast(int, v)
+            conv2d = nn.Conv2d(in_channels, v, kernel_size=3, padding=1)
+            if batch_norm:
+                layers += [conv2d, nn.BatchNorm2d(v), nn.ReLU(inplace=True)]
+            else:
+                layers += [conv2d, nn.ReLU(inplace=True)]
+            in_channels = v
+    return nn.Sequential(*layers)
+
+
 class Conv(nn.Module):
-    """ Standard convolution module """
+    """Standard Convolutional Block"""
 
     def __init__(
             self,
             in_channels: int,
             out_channels: int,
-            kernel_size: int,
-            stride: int = 1,
-            padding: int = 0,
-            dilation: int = 1,
+            kernel_size: Union[int, Tuple[int, int]] = 3,
+            stride: Union[int, Tuple[int, int]] = 1,
+            padding: Optional[int] = None,
             groups: int = 1,
-            norm: bool = False,
-            act: str = None,
+            dilation: Union[int, Tuple[int, int]] = 1,
+            inplace: bool = True,
             bias: bool = True,
     ) -> None:
         super().__init__()
-        self.conv = nn.Conv2d(in_channels=in_channels,
-                              out_channels=out_channels,
-                              kernel_size=kernel_size,
-                              stride=stride,
-                              padding=padding,
-                              dilation=dilation,
-                              groups=groups,
-                              bias=bias)
-        self.norm = nn.BatchNorm2d(num_features=out_channels) if norm else nn.Identity()
-        self.act = nn.ReLU(inplace=True) if act == 'relu' else nn.Sigmoid()
+
+        if padding is None:
+            padding = kernel_size // 2 if isinstance(kernel_size, int) else [x // 2 for x in kernel_size]
+
+        self.conv = nn.Conv2d(
+            in_channels=in_channels,
+            out_channels=out_channels,
+            kernel_size=kernel_size,
+            stride=stride,
+            padding=padding,
+            dilation=dilation,
+            groups=groups,
+            bias=bias,
+        )
+        self.norm = nn.BatchNorm2d(num_features=out_channels)
+        self.act = nn.ReLU(inplace=inplace)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.conv(x)
         x = self.norm(x)
         x = self.act(x)
-
         return x
 
 
-class VGG16(nn.Module):
-    """ Feature extractor stem: VGG16 with batch normalization """
+class FeatureExtractor(nn.Module):
+    """Feature Extractor stem: VGG16_bn"""
 
-    def __init__(self, num_classes: int = 1000, init_weights: bool = True, dropout: float = 0.5) -> None:
+    def __init__(self, cfg: str = "D", weights: Optional[str] = None):
         super().__init__()
+        model = VGG(make_layers(cfg=cfgs[cfg], batch_norm=True))
+        if weights is not None:
+            model.load_state_dict(torch.load(weights))
+        self.features = model.features
 
-        # p1/2
-        self.p1 = nn.Sequential(
-            Conv(in_channels=3, out_channels=64, kernel_size=3, padding=1, norm=True, act='relu'),
-            Conv(in_channels=64, out_channels=64, kernel_size=3, padding=1, norm=True, act='relu'),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-        )
-        # p2/4
-        self.p2 = nn.Sequential(
-            Conv(in_channels=64, out_channels=128, kernel_size=3, padding=1, norm=True, act='relu'),
-            Conv(in_channels=128, out_channels=128, kernel_size=3, padding=1, norm=True, act='relu'),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-        )
-        # p3/8
-        self.p3 = nn.Sequential(
-            Conv(in_channels=128, out_channels=256, kernel_size=3, padding=1, norm=True, act='relu'),
-            Conv(in_channels=256, out_channels=256, kernel_size=3, padding=1, norm=True, act='relu'),
-            Conv(in_channels=256, out_channels=256, kernel_size=3, padding=1, norm=True, act='relu'),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-        )
-        # p4/16
-        self.p4 = nn.Sequential(
-            Conv(in_channels=256, out_channels=512, kernel_size=3, padding=1, norm=True, act='relu'),
-            Conv(in_channels=512, out_channels=512, kernel_size=3, padding=1, norm=True, act='relu'),
-            Conv(in_channels=512, out_channels=512, kernel_size=3, padding=1, norm=True, act='relu'),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-        )
-        # p5/32
-        self.p5 = nn.Sequential(
-            Conv(in_channels=512, out_channels=512, kernel_size=3, padding=1, norm=True, act='relu'),
-            Conv(in_channels=512, out_channels=512, kernel_size=3, padding=1, norm=True, act='relu'),
-            Conv(in_channels=512, out_channels=512, kernel_size=3, padding=1, norm=True, act='relu'),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-        )
-
-        self.pool = nn.AdaptiveAvgPool2d((7, 7))
-        self.classifier = nn.Sequential(
-            nn.Linear(in_features=512 * 7 * 7, out_features=4096),
-            nn.ReLU(inplace=True),
-            nn.Dropout(p=dropout),
-            nn.Linear(in_features=4096, out_features=4096),
-            nn.ReLU(inplace=True),
-            nn.Dropout(p=dropout),
-            nn.Linear(in_features=4096, out_features=num_classes),
-        )
-
-        if init_weights:
-            _init_weights(self)
-
-    def forward(self, x: torch.Tensor) -> tuple:
-        p1 = self.p1(x)
-        p2 = self.p2(p1)
-        p3 = self.p3(p2)
-        p4 = self.p4(p3)
-        p5 = self.p5(p4)
-
-        return p2, p3, p4, p5
+    def forward(self, x):
+        out = []
+        for m in self.features:
+            x = m(x)
+            if isinstance(m, nn.MaxPool2d):
+                out.append(x)
+        return out[1:]
 
 
 class FeatureMerge(nn.Module):
-    """ Feature-merging branch """
+    """Feature-merging branch"""
 
-    def __init__(self, init_weights: bool = True) -> None:
+    def __init__(self) -> None:
         super().__init__()
-        self.interpolate = Interpolate(scale_factor=2, mode='bilinear', align_corners=True)
-        # stage 1
-        self.stage1 = nn.Sequential(
-            Conv(in_channels=1024, out_channels=128, kernel_size=1, norm=True, act='relu'),
-            Conv(in_channels=128, out_channels=128, kernel_size=3, padding=1, norm=True, act='relu'),
+        self.h2 = nn.Sequential(
+            Conv(in_channels=1024, out_channels=128, kernel_size=1),
+            Conv(in_channels=128, out_channels=128, kernel_size=3),
         )
-        # stage 2
-        self.stage2 = nn.Sequential(
-            Conv(in_channels=384, out_channels=64, kernel_size=1, norm=True, act='relu'),
-            Conv(in_channels=64, out_channels=64, kernel_size=3, padding=1, norm=True, act='relu'),
+
+        self.h3 = nn.Sequential(
+            Conv(in_channels=384, out_channels=64, kernel_size=1), Conv(in_channels=64, out_channels=64, kernel_size=3)
         )
-        # stage 3
-        self.stage3 = nn.Sequential(
-            Conv(in_channels=192, out_channels=32, kernel_size=1, norm=True, act='relu'),
-            Conv(in_channels=32, out_channels=32, kernel_size=3, padding=1, norm=True, act='relu'),
+
+        self.h4 = nn.Sequential(
+            Conv(in_channels=192, out_channels=32, kernel_size=1), Conv(in_channels=32, out_channels=32, kernel_size=3)
         )
-        # stage 4
-        self.stage4 = Conv(in_channels=32, out_channels=32, kernel_size=3, padding=1, norm=True, act='relu')
-        if init_weights:
-            _init_weights(self)
+
+        self.h5 = Conv(in_channels=32, out_channels=32, kernel_size=3)
+
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
 
     def forward(self, x: tuple) -> torch.Tensor:
-        p2, p3, p4, p5 = x
+        y = F.interpolate(x[3], scale_factor=2, mode="bilinear", align_corners=True)
+        y = torch.cat((y, x[2]), 1)
+        y = self.h2(y)
 
-        x = self.interpolate(p5)
-        x = torch.cat([x, p4], 1)
-        x = self.stage1(x)
+        y = F.interpolate(y, scale_factor=2, mode="bilinear", align_corners=True)
+        y = torch.cat((y, x[1]), 1)
+        y = self.h3(y)
 
-        x = self.interpolate(x)
-        x = torch.cat([x, p3], 1)
-        x = self.stage2(x)
+        y = F.interpolate(y, scale_factor=2, mode="bilinear", align_corners=True)
+        y = torch.cat((y, x[0]), 1)
+        y = self.h4(y)
 
-        x = self.interpolate(x)
-        x = torch.cat([x, p2], 1)
-        x = self.stage3(x)
+        y = self.h5(y)
 
-        x = self.stage4(x)
-
-        return x
+        return y
 
 
-class Head(nn.Module):
-    """ Output layer: Detection Head """
+class Output(nn.Module):
+    """Output layer: Detection Head"""
 
-    def __init__(self, scope: int = 512, init_weight: bool = True) -> None:
+    def __init__(self, scope: int = 512) -> None:
         super().__init__()
 
-        self.conv1 = Conv(in_channels=32, out_channels=1, kernel_size=1, padding=0, act='sigmoid')
-        self.conv2 = Conv(in_channels=32, out_channels=4, kernel_size=1, padding=0, act='sigmoid')
-        self.conv3 = Conv(in_channels=32, out_channels=1, kernel_size=1, padding=0, act='sigmoid')
+        self.conv1 = nn.Sequential(nn.Conv2d(in_channels=32, out_channels=1, kernel_size=1), nn.Sigmoid())
+        self.conv2 = nn.Sequential(nn.Conv2d(in_channels=32, out_channels=4, kernel_size=1), nn.Sigmoid())
+        self.conv3 = nn.Sequential(nn.Conv2d(in_channels=32, out_channels=1, kernel_size=1), nn.Sigmoid())
+
         self.scope = scope
 
-        if init_weight:
-            _init_weights(self)
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
 
     def forward(self, x: torch.Tensor) -> tuple:
-        confidence = self.conv1(x)
-        loc = self.conv2(x) * self.scope
+        score_map = self.conv1(x)
+        location = self.conv2(x) * self.scope
         angle = (self.conv3(x) - 0.5) * math.pi
-        geometries = torch.cat((loc, angle), 1)
+        geometry = torch.cat([location, angle], 1)
 
-        return confidence, geometries
+        return score_map, geometry
 
 
 class EAST(nn.Module):
-    def __init__(self, pretrained: bool = True) -> None:
+    """EAST: An Efficient and Accurate Scene Text Detector"""
+
+    def __init__(self, cfg: Optional[str] = "D", weights: Optional[str] = None, scope: int = 512) -> None:
         super().__init__()
-        self.backbone = VGG16()
+        self.extract = FeatureExtractor(cfg=cfg, weights=weights)
         self.merge = FeatureMerge()
-        self.detect = Head()
+        self.detect = Output(scope=scope)
 
     def forward(self, x: torch.Tensor) -> tuple:
-        x = self.backbone(x)
+        x = self.extract(x)
         x = self.merge(x)
         x = self.detect(x)
 
         return x
-
-
-if __name__ == '__main__':
-    net = EAST()
-    dummy = torch.randn(1, 3, 256, 256)
-    score, geo = net(dummy)
-    print(score.shape)
-    print(geo.shape)

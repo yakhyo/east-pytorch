@@ -1,10 +1,11 @@
 import os
+
 from PIL import Image
 
 from torch.utils import data
 from torchvision import transforms
 
-from .misc import extract_vertices, adjust_height, rotate, crop, get_score_geo
+from .misc import adjust_height, crop, extract_vertices, get_score_geo, rotate
 
 
 class Dataset(data.Dataset):
@@ -14,17 +15,19 @@ class Dataset(data.Dataset):
         self.gt_files = [os.path.join(gt_path, gt_file) for gt_file in sorted(os.listdir(gt_path))]
         self.scale = scale
         self.length = length
-        self.transform = transforms.Compose([
-            transforms.ColorJitter(0.5, 0.5, 0.5, 0.25),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)),
-        ])
+        self.transform = transforms.Compose(
+            [
+                transforms.ColorJitter(0.5, 0.5, 0.5, 0.25),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)),
+            ]
+        )
 
     def __len__(self):
         return len(self.image_files)
 
     def __getitem__(self, index):
-        with open(self.gt_files[index], 'r') as f:
+        with open(self.gt_files[index], "r") as f:
             lines = f.readlines()
         vertices, labels = extract_vertices(lines)
 

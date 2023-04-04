@@ -10,12 +10,11 @@ class DiceLoss(nn.Module):
     def __call__(self, gt_score, pred_score):
         inter = torch.sum(gt_score * pred_score)
         union = torch.sum(gt_score) + torch.sum(pred_score) + self.eps
-        loss = 1. - 2 * inter / union
+        loss = 1.0 - 2 * inter / union
         return loss
 
 
 class GeoLoss:
-
     def __call__(self, gt_geo, pred_geo):
         d1_gt, d2_gt, d3_gt, d4_gt, angle_gt = torch.split(gt_geo, 1, 1)
         d1_pred, d2_pred, d3_pred, d4_pred, angle_pred = torch.split(pred_geo, 1, 1)

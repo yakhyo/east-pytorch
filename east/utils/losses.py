@@ -38,19 +38,17 @@ def weight_reduce_loss(loss, weight=None, reduction="mean"):
 
 
 def dice_loss(
-        inputs: torch.Tensor,
-        targets: torch.Tensor,
-        weight: Optional[torch.Tensor] = None,
-        reduction: str = "none",
-        eps: float = 1e-5,
+    inputs: torch.Tensor,
+    targets: torch.Tensor,
+    weight: Optional[torch.Tensor] = None,
+    reduction: str = "none",
+    eps: float = 1e-5,
 ) -> torch.Tensor:
     inputs = F.softmax(inputs, dim=1)
     targets = F.one_hot(targets, inputs.shape[1]).permute(0, 3, 1, 2)
 
     if inputs.shape != targets.shape:
-        raise AssertionError(
-            f"Ground truth has different shape ({targets.shape}) from input ({inputs.shape})"
-        )
+        raise AssertionError(f"Ground truth has different shape ({targets.shape}) from input ({inputs.shape})")
 
     # flatten prediction and label tensors
     inputs = inputs.flatten()
@@ -73,10 +71,10 @@ def dice_loss(
 
 class DiceLoss(nn.Module):
     def __init__(
-            self,
-            reduction: str = "mean",
-            loss_weight: Optional[float] = 1.0,
-            eps: float = 1e-5,
+        self,
+        reduction: str = "mean",
+        loss_weight: Optional[float] = 1.0,
+        eps: float = 1e-5,
     ):
         super().__init__()
         self.reduction = reduction
@@ -84,13 +82,11 @@ class DiceLoss(nn.Module):
         self.eps = eps
 
     def forward(
-            self,
-            inputs: torch.Tensor,
-            targets: torch.Tensor,
-            weight: Optional[torch.Tensor] = None,
+        self,
+        inputs: torch.Tensor,
+        targets: torch.Tensor,
+        weight: Optional[torch.Tensor] = None,
     ):
-        loss = self.loss_weight * dice_loss(
-            inputs, targets, weight=weight, reduction=self.reduction, eps=self.eps
-        )
+        loss = self.loss_weight * dice_loss(inputs, targets, weight=weight, reduction=self.reduction, eps=self.eps)
 
         return loss

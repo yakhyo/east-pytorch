@@ -1,4 +1,10 @@
-# pip install -r requirements.txt
+# Usage: pip install -r requirements.txt
+
+# Base
+torch==2.0.0
+
+
+# Extra
 pre-commit
 flake8
 ufmt
