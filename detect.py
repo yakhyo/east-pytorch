@@ -1,14 +1,14 @@
+import argparse
 import os
 
 import lanms
 import numpy as np
-
 import torch
+from PIL import Image, ImageDraw
+from torchvision import transforms
 
 from east.models import EAST
 from east.utils import get_rotate_mat
-from PIL import Image, ImageDraw
-from torchvision import transforms
 
 
 def resize(image):
@@ -28,11 +28,11 @@ def resize(image):
 
 def is_valid_poly(res, score_shape, scale):
     """Check if the poly in image scope
-    Input:
+    Args:
         res        : restored poly in original image
         score_shape: score map shape
         scale      : feature map -> image
-    Output:
+    Return:
         True if valid
     """
     cnt = 0
@@ -44,12 +44,12 @@ def is_valid_poly(res, score_shape, scale):
 
 def restore_polys(valid_pos, valid_geo, score_shape, scale=4):
     """Restore polys from feature maps in given positions
-    Input:
+    Args:
         valid_pos  : potential text positions <numpy.ndarray, (n,2)>
         valid_geo  : geometry in valid_pos <numpy.ndarray, (5,n)>
         score_shape: shape of score map
         scale      : image / feature map
-    Output:
+    Return:
         restored polys <numpy.ndarray, (n,8)>, index
     """
     polys = []
@@ -165,15 +165,31 @@ def detect_dataset(model, device, test_img_path, submit_path):
             f.writelines(seq)
 
 
-if __name__ == "__main__":
-    img_path = "data/ch4_test_images/img_10.jpg"
-    model_path = "weights/model_epoch_10.pth"
-    res_img = "res.png"
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    model = EAST().to(device)
-    model.load_state_dict(torch.load(model_path))
-    image_ = Image.open(img_path)
+def parse_opt():
+    parser = argparse.ArgumentParser(description="EAST inference arguments")
+    parser.add_argument("--cfg", default="D", help="Configuration for backbone VGG (default D, [A, B, D, E)")
+    parser.add_argument("--weights", default="weights/model.pt", help="Path to weight file (default: model.pt)")
+    parser.add_argument("--input", type=str, default="data/ch4_test_images/img_10.jpg", help="Path to input image")
+    parser.add_argument("--output", default="output.jpg", help="Path to save mask image")
 
-    boxes_ = detect(image_, model, device)
-    plot_img = plot_boxes(image_, boxes_)
-    plot_img.save(res_img)
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    opt = parse_opt()
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # Initialize and Load weights
+    model = EAST(cfg=opt.cfg).to(device)
+    model.load_state_dict(torch.load(opt.weights))
+    model.float()
+
+    # Read image
+    image = Image.open(opt.input)
+
+    # Inference
+    boxes = detect(image, model, device)
+    plot_img = plot_boxes(image, boxes)
+
+    # Save results
+    plot_img.save(opt.output)

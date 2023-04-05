@@ -7,10 +7,14 @@ class DiceLoss(nn.Module):
         super(DiceLoss, self).__init__()
         self.eps = eps
 
-    def __call__(self, gt_score, pred_score):
-        inter = torch.sum(gt_score * pred_score)
-        union = torch.sum(gt_score) + torch.sum(pred_score) + self.eps
-        loss = 1.0 - 2 * inter / union
+    def __call__(self, inputs, targets):
+        intersection = torch.sum(inputs * targets)
+        denominator = torch.sum(inputs) + torch.sum(targets)
+
+        # calculate the dice loss
+        dice_score = (2.0 * intersection + self.eps) / (denominator + self.eps)
+        loss = 1 - dice_score
+
         return loss
 
 
@@ -45,14 +49,12 @@ class Loss(nn.Module):
         if torch.sum(gt_score) < 1:
             return torch.sum(pred_score + pred_geo) * 0
 
-        classify_loss = self.dice_loss(gt_score, pred_score * (1 - ignored_map))
+        cls_loss = self.dice_loss(pred_score * (1 - ignored_map), gt_score)
 
         iou_loss_map, angle_loss_map = self.geo_loss(gt_geo, pred_geo)
 
         angle_loss = torch.sum(angle_loss_map * gt_score) / torch.sum(gt_score)
         iou_loss = torch.sum(iou_loss_map * gt_score) / torch.sum(gt_score)
         geo_loss = self.weight_angle * angle_loss + iou_loss
-        # print('Classify loss is {:.4f}, angle loss is {:.4f}, iou loss is {:.4f}'.format(classify_loss, angle_loss,
-        #                                                                                  iou_loss))
 
-        return {"geo_loss": geo_loss, "classify_loss": classify_loss}
+        return {"geo_loss": geo_loss, "cls_loss": cls_loss}

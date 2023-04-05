@@ -1,16 +1,29 @@
 import os
 
 from PIL import Image
-
 from torch.utils import data
 from torchvision import transforms
 
 from .misc import adjust_height, crop, extract_vertices, get_score_geo, rotate
 
 
+def create_dataloader(data_path, batch_size, num_workers):
+    dataset = Dataset(data_path)
+    loader = data.DataLoader(
+        dataset,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        shuffle=True,
+        drop_last=True
+    )
+    return loader
+
+
 class Dataset(data.Dataset):
-    def __init__(self, image_path, gt_path, scale=0.25, length=512):
+    def __init__(self, data_path, scale=0.25, length=512):
         super().__init__()
+        image_path = data_path
+        gt_path = image_path.replace("_images", "_gt")
         self.image_files = [os.path.join(image_path, image_file) for image_file in sorted(os.listdir(image_path))]
         self.gt_files = [os.path.join(gt_path, gt_file) for gt_file in sorted(os.listdir(gt_path))]
         self.scale = scale

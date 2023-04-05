@@ -114,7 +114,9 @@ class FeatureExtractor(nn.Module):
         super().__init__()
         model = VGG(make_layers(cfg=cfgs[cfg], batch_norm=True))
         if weights is not None:
+            print("Loading pre-trained weights")
             model.load_state_dict(torch.load(weights))
+            print("Done")
         self.features = model.features
 
     def forward(self, x):
