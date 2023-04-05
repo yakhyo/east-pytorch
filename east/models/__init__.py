@@ -1,1 +1,1 @@
-from .nn import EAST
+from .east import EAST

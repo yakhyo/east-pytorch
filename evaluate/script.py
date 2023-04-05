@@ -1,13 +1,15 @@
-from collections import namedtuple
-import rrc_evaluation_funcs
 import importlib
+from collections import namedtuple
+
 import numpy as np
-import Polygon as plg
+import polygon as plg
+
+import rrc_evaluation_funcs
 
 
 def evaluation_imports():
     """
-    evaluation_imports: Dictionary ( key = module name , value = alias  )  with python modules used in the evaluation. 
+    evaluation_imports: Dictionary ( key = module name , value = alias  )  with python modules used in the evaluation.
     """
     return {
         'shapely.geometry': 'plg',

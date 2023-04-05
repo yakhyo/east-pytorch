@@ -1,29 +1,27 @@
-import os
-import cv2
 import math
+import os
+
+import cv2
 import numpy as np
+import torch
 from PIL import Image
 from shapely.geometry import Polygon
 
-import torch
-from torch.utils import data
-import torchvision.transforms as transforms
-
 
 def distance(x1, y1, x2, y2):
-    """ Euclidean Distance """
+    """Euclidean Distance"""
     return math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
 
 
 def move_points(vertices, index1, index2, r, coef):
-    """ Move the two points to shrink edge
-    Input:
+    """Move the two points to shrink edge
+    Args:
         vertices: vertices of text region <numpy.ndarray, (8,)>
         index1  : offset of point1
         index2  : offset of point2
         r       : [r1, r2, r3, r4] in paper
         coef    : shrink ratio in paper
-    Output:
+    Return:
         vertices: vertices where one edge has been shinked
     """
     index1 = index1 % 4
@@ -49,11 +47,11 @@ def move_points(vertices, index1, index2, r, coef):
 
 
 def shrink_poly(vertices, coef=0.3):
-    """ Shrink the text region
-    Input:
+    """Shrink the text region
+    Args:
         vertices: vertices of text region <numpy.ndarray, (8,)>
         coef    : shrink ratio in paper
-    Output:
+    Return:
         v       : vertices of shrinked text region <numpy.ndarray, (8,)>
     """
     x1, y1, x2, y2, x3, y3, x4, y4 = vertices
@@ -64,8 +62,7 @@ def shrink_poly(vertices, coef=0.3):
     r = [r1, r2, r3, r4]
 
     # obtain offset to perform move_points() automatically
-    if distance(x1, y1, x2, y2) + distance(x3, y3, x4, y4) > \
-            distance(x2, y2, x3, y3) + distance(x1, y1, x4, y4):
+    if distance(x1, y1, x2, y2) + distance(x3, y3, x4, y4) > distance(x2, y2, x3, y3) + distance(x1, y1, x4, y4):
         offset = 0  # two longer edges are (x1y1-x2y2) & (x3y3-x4y4)
     else:
         offset = 1  # two longer edges are (x2y2-x3y3) & (x4y4-x1y1)
@@ -84,12 +81,12 @@ def get_rotate_mat(theta):
 
 
 def rotate_vertices(vertices, theta, anchor=None):
-    """ Rotate vertices around anchor
-    Input:
+    """Rotate vertices around anchor
+    Args:
         vertices: vertices of text region <numpy.ndarray, (8,)>
         theta   : angle in radian measure
         anchor  : fixed position during rotation
-    Output:
+    Return:
         rotated vertices <numpy.ndarray, (8,)>
     """
     v = vertices.reshape((4, 2)).T
@@ -101,10 +98,10 @@ def rotate_vertices(vertices, theta, anchor=None):
 
 
 def get_boundary(vertices):
-    """ Get the tight boundary around given vertices
-    Input:
+    """Get the tight boundary around given vertices
+    Args:
         vertices: vertices of text region <numpy.ndarray, (8,)>
-    Output:
+    Return:
         the boundary
     """
     x1, y1, x2, y2, x3, y3, x4, y4 = vertices
@@ -116,25 +113,29 @@ def get_boundary(vertices):
 
 
 def calculate_error(vertices):
-    """ Default orientation is x1y1 : left-top, x2y2 : right-top, x3y3 : right-bot, x4y4 : left-bot
+    """Default orientation is x1y1 : left-top, x2y2 : right-top, x3y3 : right-bot, x4y4 : left-bot
     calculate the difference between the vertices orientation and default orientation
-    Input:
+    Args:
         vertices: vertices of text region <numpy.ndarray, (8,)>
-    Output:
+    Return:
         err     : difference measure
     """
     x_min, x_max, y_min, y_max = get_boundary(vertices)
     x1, y1, x2, y2, x3, y3, x4, y4 = vertices
-    err = distance(x1, y1, x_min, y_min) + distance(x2, y2, x_max, y_min) + \
-          distance(x3, y3, x_max, y_max) + distance(x4, y4, x_min, y_max)
+    err = (
+            distance(x1, y1, x_min, y_min)
+            + distance(x2, y2, x_max, y_min)
+            + distance(x3, y3, x_max, y_max)
+            + distance(x4, y4, x_min, y_max)
+    )
     return err
 
 
 def find_min_rect_angle(vertices):
     """find the best angle to rotate poly and obtain min rectangle
-    Input:
+    Args:
         vertices: vertices of text region <numpy.ndarray, (8,)>
-    Output:
+    Return:
         the best angle <radian measure>
     """
     angle_interval = 1
@@ -143,12 +144,11 @@ def find_min_rect_angle(vertices):
     for theta in angle_list:
         rotated = rotate_vertices(vertices, theta / 180 * math.pi)
         x1, y1, x2, y2, x3, y3, x4, y4 = rotated
-        temp_area = (max(x1, x2, x3, x4) - min(x1, x2, x3, x4)) * \
-                    (max(y1, y2, y3, y4) - min(y1, y2, y3, y4))
+        temp_area = (max(x1, x2, x3, x4) - min(x1, x2, x3, x4)) * (max(y1, y2, y3, y4) - min(y1, y2, y3, y4))
         area_list.append(temp_area)
 
     sorted_area_index = sorted(list(range(len(area_list))), key=lambda k: area_list[k])
-    min_error = float('inf')
+    min_error = float("inf")
     best_index = -1
     rank_num = 10
     # find the best angle with correct orientation
@@ -163,18 +163,19 @@ def find_min_rect_angle(vertices):
 
 def is_cross_text(start_loc, length, vertices):
     """check if the crop image crosses text regions
-    Input:
+    Args:
         start_loc: left-top position
         length   : length of crop image
         vertices : vertices of text regions <numpy.ndarray, (n,8)>
-    Output:
+    Return:
         True if crop image crosses text region
     """
     if vertices.size == 0:
         return False
     start_w, start_h = start_loc
-    a = np.array([start_w, start_h, start_w + length, start_h, \
-                  start_w + length, start_h + length, start_w, start_h + length]).reshape((4, 2))
+    a = np.array(
+        [start_w, start_h, start_w + length, start_h, start_w + length, start_h + length, start_w, start_h + length]
+    ).reshape((4, 2))
     p1 = Polygon(a).convex_hull
     for vertice in vertices:
         p2 = Polygon(vertice.reshape((4, 2))).convex_hull
@@ -186,12 +187,12 @@ def is_cross_text(start_loc, length, vertices):
 
 def crop(image, vertices, labels, length):
     """crop image patches to obtain batch and augment
-    Input:
+    Args:
         image         : PIL Image
         vertices    : vertices of text regions <numpy.ndarray, (n,8)>
         labels      : 1->valid, 0->ignore, <numpy.ndarray, (n,)>
         length      : length of cropped image region
-    Output:
+    Return:
         region      : cropped image region
         new_vertices: new vertices in cropped region
     """
@@ -203,7 +204,7 @@ def crop(image, vertices, labels, length):
         image = image.resize((int(w * length / h), length), Image.BILINEAR)
     ratio_w = image.width / w
     ratio_h = image.height / h
-    assert (ratio_w >= 1 and ratio_h >= 1)
+    assert ratio_w >= 1 and ratio_h >= 1
 
     new_vertices = np.zeros(vertices.shape)
     if vertices.size > 0:
@@ -231,13 +232,13 @@ def crop(image, vertices, labels, length):
 
 
 def rotate_all_pixels(rotate_mat, anchor_x, anchor_y, length):
-    """ Get rotated locations of all pixels for next stages
-    Input:
+    """Get rotated locations of all pixels for next stages
+    Args:
         rotate_mat: rotatation matrix
         anchor_x  : fixed x position
         anchor_y  : fixed y position
         length    : length of image
-    Output:
+    Return:
         rotated_x : rotated x positions <numpy.ndarray, (length,length)>
         rotated_y : rotated y positions <numpy.ndarray, (length,length)>
     """
@@ -247,20 +248,21 @@ def rotate_all_pixels(rotate_mat, anchor_x, anchor_y, length):
     x_lin = x.reshape((1, x.size))
     y_lin = y.reshape((1, x.size))
     coord_mat = np.concatenate((x_lin, y_lin), 0)
-    rotated_coord = np.dot(rotate_mat, coord_mat - np.array([[anchor_x], [anchor_y]])) + \
-                    np.array([[anchor_x], [anchor_y]])
+    rotated_coord = np.dot(rotate_mat, coord_mat - np.array([[anchor_x], [anchor_y]])) + np.array(
+        [[anchor_x], [anchor_y]]
+    )
     rotated_x = rotated_coord[0, :].reshape(x.shape)
     rotated_y = rotated_coord[1, :].reshape(y.shape)
     return rotated_x, rotated_y
 
 
 def adjust_height(image, vertices, ratio=0.2):
-    """ Adjust height of image to aug data
-    Input:
+    """Adjust height of image to aug data
+    Args:
         image         : PIL Image
         vertices    : vertices of text regions <numpy.ndarray, (n,8)>
         ratio       : height changes in [0.8, 1.2]
-    Output:
+    Return:
         image         : adjusted PIL Image
         new_vertices: adjusted vertices
     """
@@ -276,12 +278,12 @@ def adjust_height(image, vertices, ratio=0.2):
 
 
 def rotate(image, vertices, angle_range=10):
-    """ Rotate image [-10, 10] degree to aug data
-    Input:
+    """Rotate image [-10, 10] degree to aug data
+    Args:
         image         : PIL Image
         vertices    : vertices of text regions <numpy.ndarray, (n,8)>
         angle_range : rotate range
-    Output:
+    Return:
         image         : rotated PIL Image
         new_vertices: rotated vertices
     """
@@ -296,14 +298,14 @@ def rotate(image, vertices, angle_range=10):
 
 
 def get_score_geo(image, vertices, labels, scale, length):
-    """ Generate score gt and geometry gt
-    Input:
+    """Generate score gt and geometry gt
+    Args:
         image     : PIL Image
         vertices: vertices of text regions <numpy.ndarray, (n,8)>
         labels  : 1->valid, 0->ignore, <numpy.ndarray, (n,)>
         scale   : feature map / image
         length  : image length
-    Output:
+    Return:
         score gt, geo gt, ignored
     """
     score_map = np.zeros((int(image.height * scale), int(image.width * scale), 1), np.float32)
@@ -357,22 +359,33 @@ def get_score_geo(image, vertices, labels, scale, length):
 
 
 def extract_vertices(lines):
-    """ Extract vertices info from txt lines
-    Input:
+    """Extract vertices info from txt lines
+    Args:
         lines   : list of string info
-    Output:
+    Return:
         vertices: vertices of text regions <numpy.ndarray, (n,8)>
         labels  : 1->valid, 0->ignore, <numpy.ndarray, (n,)>
     """
     labels = []
     vertices = []
     for line in lines:
-
-        label = 0 if '###' in line else 1
-        coord = list(map(int, line.rstrip('\n').lstrip('\ufeff').split(',')[:8]))
+        label = 0 if "###" in line else 1
+        coord = list(map(int, line.rstrip("\n").lstrip("\ufeff").split(",")[:8]))
 
         vertices.append(coord)
         labels.append(label)
 
     return np.array(vertices), np.array(labels)
 
+
+def strip_optimizer(s, f="model_f16.pt"):
+    x = torch.load(s, map_location=torch.device("cpu"))
+    for k in "optimizer", "updates", "best_fitness":  # keys
+        x[k] = None
+    x["epoch"] = -1  # ignore for now
+    x["model"].half()  # to FP16
+    for p in x["model"].parameters():
+        p.requires_grad = False
+    torch.save(x, s.replace("model.ckpt", "model_f16.pt"))
+    file_size = os.path.getsize(f) / 1e6
+    print(f"Optimizer stripped from {s},{(' saved as %s,' % f)} {file_size:.1f}MB")
