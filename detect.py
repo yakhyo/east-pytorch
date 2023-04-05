@@ -4,11 +4,11 @@ import os
 import lanms
 import numpy as np
 import torch
-from PIL import Image, ImageDraw
-from torchvision import transforms
 
 from east.models import EAST
 from east.utils import get_rotate_mat
+from PIL import Image, ImageDraw
+from torchvision import transforms
 
 
 def resize(image):

@@ -25,7 +25,6 @@ repos:
     hooks:
       - id: flake8
         args: [--config=setup.cfg]
-        exclude: evaluate
         name: PEP8
 
   - repo: https://github.com/PyCQA/pydocstyle

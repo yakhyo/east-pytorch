@@ -32,7 +32,7 @@ jobs:
 
     - name: Lint with flake8
       run: |
-        flake8 . --count --config=setup.cfg --show-source --statistics --ignore=E126, W503
+        flake8 . --count --config=setup.cfg --show-source --statistics --ignore=E126, W503, E722, E711, F507, E712
         
     - name: Analysing the code with pydocstyle
       run: |

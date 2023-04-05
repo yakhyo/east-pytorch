@@ -66,8 +66,8 @@ def train(opt, model, device):
             optimizer.step()
             mem = f"{torch.cuda.memory_reserved() / 1E9 if torch.cuda.is_available() else 0:.3g}G"  # (GB)
             progress_bar.set_description(
-                ("%12s" * 2 + "%12.4g" * 2) % (
-                    f"{epoch + 1}/{opt.epochs}", mem, loss_dict["geo_loss"], loss_dict["cls_loss"])
+                ("%12s" * 2 + "%12.4g" * 2)
+                % (f"{epoch + 1}/{opt.epochs}", mem, loss_dict["geo_loss"], loss_dict["cls_loss"])
             )
 
         scheduler.step()
@@ -97,10 +97,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="EAST: An Efficient and Accurate Scene Text Detector")
     parser.add_argument("--cfg", default="D", type=str, help="VGG backbone config | [A, B, D, E]")
     parser.add_argument("--data-path", default="data/ch4_train_images", help="Path to training images")
-    parser.add_argument("--pretrained", default="./weights/vgg16_bn-6c64b313.pth", type=str,
-                        help="Pretrained backbone path | None")
-    parser.add_argument("--checkpoint", default="./weights/model.ckpt", type=str,
-                        help="Continue the training from checkpoint")
+    parser.add_argument(
+        "--pretrained", default="./weights/vgg16_bn-6c64b313.pth", type=str, help="Pretrained backbone path | None"
+    )
+    parser.add_argument(
+        "--checkpoint", default="./weights/model.ckpt", type=str, help="Continue the training from checkpoint"
+    )
     parser.add_argument("--save-dir", default="./weights", help="Path to saving weights")
     parser.add_argument("--batch-size", default=20, type=int, help="Batch size")
     parser.add_argument("--learning-rate", default=1e-3, type=float, help="Learning rate")
