@@ -106,4 +106,4 @@ and [Code of Conduct](.github/CODE_OF_CONDUCT.md).
 The project is licensed under the [MIT license](https://opensource.org/license/mit/).
 
 ## Reference
-1. The code refers to https://github.com/SakuraRiven/EAST with some modifications.
+1. Some part of the code refers to https://github.com/SakuraRiven/EAST.
